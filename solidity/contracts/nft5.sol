@@ -9,14 +9,11 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@opengsn/contracts/src/ERC2771Recipient.sol";
 
-
-
 contract Nft5 is Ownable, ERC721URIStorage, ERC2771Recipient {
     using Counters for Counters.Counter;
     Counters.Counter private _freeNftIds;
     Counters.Counter private _paidNftIds;
     using SafeERC20 for IERC20;
-
 
     uint256 public FREE_MAX_SUPPLY;
     uint256 public PAID_MAX_SUPPLY;   
@@ -48,12 +45,12 @@ contract Nft5 is Ownable, ERC721URIStorage, ERC2771Recipient {
     }
 
     function setMintFee(uint256 fee) public onlyOwner() returns(uint256) {
-        MINT_FEE = fee;
+        MINT_FEE = fee * 1 ether;
         return MINT_FEE;
     }
 
     function freeMint(string memory _tokenUri) public  returns (uint256) {
-        require(totalSupply() <= FREE_MAX_SUPPLY-1, "Registration Closed");
+        require(freeTotalSupply() <= FREE_MAX_SUPPLY-1, "Registration Closed");
         require(bytes(_tokenUri).length != 0, "Token Uri Required");
 
         _freeNftIds.increment();
@@ -64,7 +61,7 @@ contract Nft5 is Ownable, ERC721URIStorage, ERC2771Recipient {
     }
 
      function paidMint(string memory _tokenUri) public payable returns (uint256) {
-        require(totalSupply() <= PAID_MAX_SUPPLY-1, "Registration Closed");
+        require(paidTotalSupply() <= PAID_MAX_SUPPLY-1, "Registration Closed");
         require(bytes(_tokenUri).length != 0, "Token Uri Required");
         require(msg.value == MINT_FEE, "Insufficient MATIC");
 
@@ -87,6 +84,14 @@ contract Nft5 is Ownable, ERC721URIStorage, ERC2771Recipient {
         }
 
         emit collectFeeEvent(owner(), _tokenAddress, balance);
+    }
+
+    function freeTotalSupply() public view returns (uint256) {
+        return _freeNftIds.current();
+    }
+
+    function paidTotalSupply() public view returns (uint256) {
+        return _paidNftIds.current();
     }
 
     function totalSupply() public view returns (uint256) {
