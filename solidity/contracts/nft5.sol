@@ -14,12 +14,21 @@ contract Nft5 is Ownable, ERC721URIStorage, ERC2771Recipient {
     Counters.Counter private _freeNftIds;
     Counters.Counter private _paidNftIds;
     using SafeERC20 for IERC20;
-
+ 
     uint256 public FREE_MAX_SUPPLY;
     uint256 public PAID_MAX_SUPPLY;   
     uint public MINT_FEE; 
 
+    mapping (address => uint256) public freeMintedList;
+    mapping (address => uint256) public paidMintedList;
+    mapping (address => bool) public blackList;
+
     event collectFeeEvent(address indexed owner, address indexed _tokenAddress, uint256 balance);
+
+     modifier onlyWhiteListed() {
+         require(!blackList[_msgSender()], "User Blaclisted");
+        _;
+    }
 
     function _msgSender() internal view override(Context, ERC2771Recipient) returns(address) {
         return ERC2771Recipient._msgSender();
@@ -45,23 +54,26 @@ contract Nft5 is Ownable, ERC721URIStorage, ERC2771Recipient {
     }
 
     function setMintFee(uint256 fee) public onlyOwner() returns(uint256) {
-        MINT_FEE = fee * 1 ether;
+        MINT_FEE = fee;
         return MINT_FEE;
     }
 
-    function freeMint(string memory _tokenUri) public  returns (uint256) {
+    function freeMint(string memory _tokenUri) public onlyWhiteListed() returns (uint256) {
         require(freeTotalSupply() <= FREE_MAX_SUPPLY-1, "Registration Closed");
+        require(freeMintedList[_msgSender()] == 0, "Already Minted");
         require(bytes(_tokenUri).length != 0, "Token Uri Required");
 
         _freeNftIds.increment();
         uint256 newItemId = _freeNftIds.current();
         _safeMint(_msgSender(), newItemId);
         _setTokenURI(newItemId, _tokenUri);
+        freeMintedList[_msgSender()] = newItemId;
         return newItemId;
     }
 
-     function paidMint(string memory _tokenUri) public payable returns (uint256) {
+     function paidMint(string memory _tokenUri) public payable onlyWhiteListed() returns (uint256) {
         require(paidTotalSupply() <= PAID_MAX_SUPPLY-1, "Registration Closed");
+        require(paidMintedList[_msgSender()] == 0, "Already Minted");
         require(bytes(_tokenUri).length != 0, "Token Uri Required");
         require(msg.value == MINT_FEE, "Insufficient MATIC");
 
@@ -69,7 +81,17 @@ contract Nft5 is Ownable, ERC721URIStorage, ERC2771Recipient {
         uint256 newItemId = _paidNftIds.current();
         _safeMint(_msgSender(), newItemId);
         _setTokenURI(newItemId, _tokenUri);
+        paidMintedList[_msgSender()] = newItemId;
         return newItemId;
+    }
+
+    function addToBlackList(address _account) external onlyOwner() {
+        blackList[_account] = true;
+    }
+
+     function removeFromBlackList(address _account) external onlyOwner() {
+        require(blackList[_account], "User Not Found");
+        blackList[_account] = false;
     }
 
     function collectFee(address _tokenAddress) external onlyOwner() {
